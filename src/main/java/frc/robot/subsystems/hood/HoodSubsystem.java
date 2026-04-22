@@ -61,6 +61,11 @@ public class HoodSubsystem extends SubsystemBase {
         motor.stopMotor();
     }
 
+    /** Duty-Cycle 直接制御 — モーター動作確認専用 (-1.0〜1.0)。 */
+    public void setOutput(double pct) {
+        motor.set(pct);
+    }
+
     public double getAngleDeg() {
         return rotationsToDeg(motor.getPosition().getValueAsDouble());
     }

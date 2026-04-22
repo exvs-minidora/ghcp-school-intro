@@ -12,17 +12,18 @@ import frc.robot.Constants.ShooterConstants;
  * 射出ホイールを 2 モータで制御するサブシステム。
  * CTRE KrakenX60 (TalonFX / Phoenix 6) を使用する。
  * 速度単位は RPS (rotations per second) で統一し、外部 RPM を変換して渡す。
+ * モータ配置: leftMotor / rightMotor (水平横並び、ボール下方から射出)
  */
 public class ShooterSubsystem extends SubsystemBase {
 
-    private final TalonFX topMotor;
-    private final TalonFX bottomMotor;
+    private final TalonFX leftMotor;
+    private final TalonFX rightMotor;
 
-    private final VelocityVoltage topRequest    = new VelocityVoltage(0).withSlot(0);
-    private final VelocityVoltage bottomRequest = new VelocityVoltage(0).withSlot(0);
+    private final VelocityVoltage leftRequest  = new VelocityVoltage(0).withSlot(0);
+    private final VelocityVoltage rightRequest = new VelocityVoltage(0).withSlot(0);
 
-    private double targetTopRpm    = 0.0;
-    private double targetBottomRpm = 0.0;
+    private double targetLeftRpm  = 0.0;
+    private double targetRightRpm = 0.0;
 
     // Flywheel debounce — RPM 範囲内を一定時間維持して初めて READY とする
     private final Timer debounceTimer   = new Timer();
@@ -30,8 +31,8 @@ public class ShooterSubsystem extends SubsystemBase {
     private boolean     flywheelReady   = false;
 
     public ShooterSubsystem() {
-        topMotor    = new TalonFX(ShooterConstants.TOP_MOTOR_ID);
-        bottomMotor = new TalonFX(ShooterConstants.BOTTOM_MOTOR_ID);
+        leftMotor  = new TalonFX(ShooterConstants.LEFT_MOTOR_ID);
+        rightMotor = new TalonFX(ShooterConstants.RIGHT_MOTOR_ID);
 
         TalonFXConfiguration cfg = new TalonFXConfiguration();
         cfg.Slot0.kP = ShooterConstants.KP;
@@ -41,18 +42,18 @@ public class ShooterSubsystem extends SubsystemBase {
         cfg.CurrentLimits.SupplyCurrentLimit       = 60;
         cfg.CurrentLimits.SupplyCurrentLimitEnable = true;
 
-        topMotor.getConfigurator().apply(cfg);
-        bottomMotor.getConfigurator().apply(cfg);
+        leftMotor.getConfigurator().apply(cfg);
+        rightMotor.getConfigurator().apply(cfg);
     }
 
     @Override
     public void periodic() {
-        double topRpm    = topMotor.getVelocity().getValueAsDouble()    * 60.0;
-        double bottomRpm = bottomMotor.getVelocity().getValueAsDouble() * 60.0;
+        double leftRpm  = leftMotor.getVelocity().getValueAsDouble()  * 60.0;
+        double rightRpm = rightMotor.getVelocity().getValueAsDouble() * 60.0;
 
-        boolean withinTol = targetTopRpm > 0.0
-            && Math.abs(topRpm    - targetTopRpm)    < ShooterConstants.RPM_TOLERANCE
-            && Math.abs(bottomRpm - targetBottomRpm) < ShooterConstants.RPM_TOLERANCE;
+        boolean withinTol = targetLeftRpm > 0.0
+            && Math.abs(leftRpm  - targetLeftRpm)  < ShooterConstants.RPM_TOLERANCE
+            && Math.abs(rightRpm - targetRightRpm) < ShooterConstants.RPM_TOLERANCE;
 
         if (withinTol) {
             if (!debounceRunning) {
@@ -66,19 +67,19 @@ public class ShooterSubsystem extends SubsystemBase {
             flywheelReady   = false;
         }
 
-        SmartDashboard.putNumber("Shooter/TopRPM",    topRpm);
-        SmartDashboard.putNumber("Shooter/BottomRPM", bottomRpm);
-        SmartDashboard.putNumber("Shooter/TargetRPM", targetTopRpm);
+        SmartDashboard.putNumber("Shooter/LeftRPM",  leftRpm);
+        SmartDashboard.putNumber("Shooter/RightRPM", rightRpm);
+        SmartDashboard.putNumber("Shooter/TargetRPM", targetLeftRpm);
         SmartDashboard.putBoolean("Shooter/AtSpeed",  flywheelReady);
     }
 
     // ── コマンド向け API ──────────────────────────────────────
 
-    public void setVelocity(double topRpm, double bottomRpm) {
-        targetTopRpm    = topRpm;
-        targetBottomRpm = bottomRpm;
-        topMotor.setControl(topRequest.withVelocity(topRpm / 60.0));
-        bottomMotor.setControl(bottomRequest.withVelocity(bottomRpm / 60.0));
+    public void setVelocity(double leftRpm, double rightRpm) {
+        targetLeftRpm  = leftRpm;
+        targetRightRpm = rightRpm;
+        leftMotor.setControl(leftRequest.withVelocity(leftRpm  / 60.0));
+        rightMotor.setControl(rightRequest.withVelocity(rightRpm / 60.0));
     }
 
     public void setVelocity(double rpm) {
@@ -86,16 +87,16 @@ public class ShooterSubsystem extends SubsystemBase {
     }
 
     public void spinUp() {
-        setVelocity(ShooterConstants.DEFAULT_TOP_RPM, ShooterConstants.DEFAULT_BOTTOM_RPM);
+        setVelocity(ShooterConstants.DEFAULT_LEFT_RPM, ShooterConstants.DEFAULT_RIGHT_RPM);
     }
 
     public void stop() {
-        targetTopRpm = targetBottomRpm = 0.0;
+        targetLeftRpm = targetRightRpm = 0.0;
         flywheelReady   = false;
         debounceRunning = false;
         debounceTimer.stop();
-        topMotor.stopMotor();
-        bottomMotor.stopMotor();
+        leftMotor.stopMotor();
+        rightMotor.stopMotor();
     }
 
     public boolean isAtVelocity() {
