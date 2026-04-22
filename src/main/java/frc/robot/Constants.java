@@ -74,12 +74,12 @@ public final class Constants {
     //  Shooter — CAN IDs & 制御
     // ─────────────────────────────────────────────
     public static final class ShooterConstants {
-        public static final int TOP_MOTOR_ID    = 20;
-        public static final int BOTTOM_MOTOR_ID = 21;
+        public static final int LEFT_MOTOR_ID  = 20;
+        public static final int RIGHT_MOTOR_ID = 21;
 
         // 通常射出の目標 RPM（距離テーブルで上書き）
-        public static final double DEFAULT_TOP_RPM    = 3000.0;
-        public static final double DEFAULT_BOTTOM_RPM = 3000.0;
+        public static final double DEFAULT_LEFT_RPM  = 3000.0;
+        public static final double DEFAULT_RIGHT_RPM = 3000.0;
 
         // ── 2段階 RPM ──────────────────────────────────
         // ~3 m: 近距離固定 RPM

@@ -68,6 +68,11 @@ public class ExtensionSubsystem extends SubsystemBase {
         motor.stopMotor();
     }
 
+    /** Duty-Cycle 直接制御 — モーター動作確認専用 (-1.0〜1.0)。 */
+    public void setOutput(double pct) {
+        motor.set(pct);
+    }
+
     /** ThroughBoreEncoder の絶対値を使って TalonFX 内部エンコーダをゼロリセットする。 */
     public void resetEncoderFromAbsolute() {
         motor.setPosition(absoluteEncoder.get());

@@ -90,4 +90,9 @@ public class PoseEstimatorSubsystem extends SubsystemBase {
     public void resetPose(Pose2d pose) {
         estimator.resetPosition(drivetrain.getYaw(), drivetrain.getModulePositions(), pose);
     }
+
+    /** ジャイロをゼロリセットし、現在向きを 0 rad とする (POV 下ボタン用)。 */
+    public void resetGyro() {
+        drivetrain.zeroGyro();
+    }
 }

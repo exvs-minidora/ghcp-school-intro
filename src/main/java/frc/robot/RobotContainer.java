@@ -1,6 +1,7 @@
 package frc.robot;
 
 import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import frc.robot.Constants.OperatorConstants;
 import frc.robot.autonomous.AutoFactory;
@@ -26,7 +27,20 @@ import frc.robot.vision.VisionFusion;
 
 /**
  * すべてのサブシステム・コマンド・ボタンバインドを統合するクラス。
- * RoboRIO 上で動作するエントリポイントとして機能する。
+ * コントローラは 1 台 (port 0) のみ使用する。
+ *
+ * <pre>
+ * 左スティック XY   : 並進移動
+ * 右スティック X    : 旋回
+ * A  (hold)        : AimAndShoot — HUB 自動照準 + Hood + FlywheelReady ゲート付き射出
+ * B  (hold)        : CarryShoot  — NEUTRAL ZONE キャリーショット
+ * X  (hold)        : Intake
+ * Y  (hold)        : ShootCommand — 手動フォールバック (Hood なし)
+ * RB (hold → 離す) : Extension 展開 → 格納
+ * LB (hold)        : Feeder 単独 (詰まり解除など)
+ * Start            : ホイールロック (X フォーメーション)
+ * POV 下           : ジャイロリセット
+ * </pre>
  */
 public class RobotContainer {
 
@@ -47,71 +61,63 @@ public class RobotContainer {
     public final VisionFusion visionFusion =
         new VisionFusion(poseEstimator, limelight);
 
-    // ── Controllers ─────────────────────────────────────────────
-    private final CommandXboxController driver =
+    // ── Controller (1 台のみ, port 0) ──────────────────────────
+    private final CommandXboxController controller =
         new CommandXboxController(OperatorConstants.DRIVER_CONTROLLER_PORT);
-    private final CommandXboxController operator =
-        new CommandXboxController(OperatorConstants.OPERATOR_CONTROLLER_PORT);
 
     // ── Autonomous ──────────────────────────────────────────────
     private final AutoFactory autoFactory;
 
     public RobotContainer() {
-        // PathPlanner AutoBuilder を初期化し Named Commands を登録する
         autoFactory = new AutoFactory(this);
-
-        // デフォルトコマンドとボタンバインドを設定する
         configureDefaultCommands();
         configureButtonBindings();
     }
 
-    /** 各サブシステムのデフォルトコマンドを設定する */
     private void configureDefaultCommands() {
         drivetrain.setDefaultCommand(
             new TeleopSwerveCommand(
                 drivetrain,
                 poseEstimator,
-                () -> -driver.getLeftY(),
-                () -> -driver.getLeftX(),
-                () -> -driver.getRightX()
+                () -> -controller.getLeftY(),
+                () -> -controller.getLeftX(),
+                () -> -controller.getRightX()
             )
         );
     }
 
-    /** ボタンバインドを設定する */
     private void configureButtonBindings() {
-        // ── Driver ──────────────────────────────────────────────
-        // A ボタン長押し: HUB 自動 Aim + Hood + FlywheelReady ゲート付き射出
-        driver.a().whileTrue(new AimAndShootCommand(
+
+        // A 長押し: HUB 自動照準 + Hood + FlywheelReady ゲート付き射出
+        controller.a().whileTrue(new AimAndShootCommand(
             drivetrain, poseEstimator, hood, shooter, feeder, spindexer));
 
-        // B ボタン長押し: NEUTRAL ZONE キャリーショット (自陣へパス射出)
-        driver.b().whileTrue(new CarryShootCommand(
+        // B 長押し: NEUTRAL ZONE キャリーショット
+        controller.b().whileTrue(new CarryShootCommand(
             drivetrain, poseEstimator, hood, shooter, feeder, spindexer));
 
-        // Start ボタン: ホイールロック (X フォーメーション)
-        driver.start().whileTrue(new LockWheelsCommand(drivetrain));
+        // X 長押し: Intake
+        controller.x().whileTrue(new IntakeCommand(intake));
 
-        // ── Operator ────────────────────────────────────────────
-        // 右バンパー: Intake
-        operator.rightBumper().whileTrue(new IntakeCommand(intake));
+        // Y 長押し: 手動 ShootCommand フォールバック (Flywheel / Hood 故障時)
+        controller.y().whileTrue(new ShootCommand(shooter, feeder, spindexer));
 
-        // 左バンパー: Extension 展開 / 離したら格納
-        operator.leftBumper()
+        // RB 長押し → 離す: Extension 展開 → 格納
+        controller.rightBumper()
             .onTrue(new ExtendCommand(extension))
             .onFalse(new RetractCommand(extension));
 
-        // A ボタン: 手動 Shoot フォールバック (Hood なし / Flywheel 故障時用)
-        operator.a().whileTrue(new ShootCommand(shooter, feeder, spindexer));
+        // LB 長押し: Feeder 単独
+        controller.leftBumper().whileTrue(new FeedCommand(feeder));
 
-        // B ボタン: Feeder 単独
-        operator.b().whileTrue(new FeedCommand(feeder));
+        // Start: ホイールロック (X フォーメーション)
+        controller.start().whileTrue(new LockWheelsCommand(drivetrain));
+
+        // POV 下: ジャイロリセット
+        controller.povDown().onTrue(
+            Commands.runOnce(poseEstimator::resetGyro, poseEstimator));
     }
 
-    /**
-     * 選択された自律コマンドを返す。
-     * PathPlanner Auto Chooser の選択値が返される。
-     */
     public Command getAutonomousCommand() {
         return autoFactory.getSelectedAuto();
     }
