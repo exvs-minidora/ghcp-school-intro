@@ -1,21 +1,23 @@
 package frc.robot;
 
-import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import frc.robot.Constants.OperatorConstants;
 import frc.robot.autonomous.AutoFactory;
-import frc.robot.commands.aim.AimSpeakerCommand;
+import frc.robot.commands.drive.LockWheelsCommand;
 import frc.robot.commands.drive.TeleopSwerveCommand;
 import frc.robot.commands.extension.ExtendCommand;
 import frc.robot.commands.extension.RetractCommand;
 import frc.robot.commands.feeder.FeedCommand;
 import frc.robot.commands.intake.IntakeCommand;
+import frc.robot.commands.shooter.AimAndShootCommand;
+import frc.robot.commands.shooter.CarryShootCommand;
 import frc.robot.commands.shooter.ShootCommand;
 import frc.robot.localization.PoseEstimatorSubsystem;
 import frc.robot.subsystems.drivetrain.DrivebaseSubsystem;
 import frc.robot.subsystems.extension.ExtensionSubsystem;
 import frc.robot.subsystems.feeder.FeederSubsystem;
+import frc.robot.subsystems.hood.HoodSubsystem;
 import frc.robot.subsystems.intake.IntakeSubsystem;
 import frc.robot.subsystems.shooter.ShooterSubsystem;
 import frc.robot.vision.LimelightSubsystem;
@@ -33,6 +35,7 @@ public class RobotContainer {
     public final FeederSubsystem      feeder      = new FeederSubsystem();
     public final IntakeSubsystem      intake      = new IntakeSubsystem();
     public final ExtensionSubsystem   extension   = new ExtensionSubsystem();
+    public final HoodSubsystem        hood        = new HoodSubsystem();
 
     // ── Localization & Vision ───────────────────────────────────
     public final PoseEstimatorSubsystem poseEstimator =
@@ -76,11 +79,16 @@ public class RobotContainer {
     /** ボタンバインドを設定する */
     private void configureButtonBindings() {
         // ── Driver ──────────────────────────────────────────────
-        // A ボタン長押し: Speaker へ Aim
-        driver.a().whileTrue(new AimSpeakerCommand(drivetrain, poseEstimator));
+        // A ボタン長押し: HUB 自動 Aim + Hood + FlywheelReady ゲート付き射出
+        driver.a().whileTrue(new AimAndShootCommand(
+            drivetrain, poseEstimator, hood, shooter, feeder));
+
+        // B ボタン長押し: NEUTRAL ZONE キャリーショット (自陣へパス射出)
+        driver.b().whileTrue(new CarryShootCommand(
+            drivetrain, poseEstimator, hood, shooter, feeder));
 
         // Start ボタン: ホイールロック (X フォーメーション)
-        // TODO: driver.start().onTrue(new LockWheelsCommand(drivetrain));
+        driver.start().whileTrue(new LockWheelsCommand(drivetrain));
 
         // ── Operator ────────────────────────────────────────────
         // 右バンパー: Intake
@@ -91,7 +99,7 @@ public class RobotContainer {
             .onTrue(new ExtendCommand(extension))
             .onFalse(new RetractCommand(extension));
 
-        // A ボタン: Shoot シーケンス (Shooter + Feeder)
+        // A ボタン: 手動 Shoot フォールバック (Hood なし / Flywheel 故障時用)
         operator.a().whileTrue(new ShootCommand(shooter, feeder));
 
         // B ボタン: Feeder 単独

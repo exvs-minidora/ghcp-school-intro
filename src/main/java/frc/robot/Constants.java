@@ -81,8 +81,24 @@ public final class Constants {
         public static final double DEFAULT_TOP_RPM    = 3000.0;
         public static final double DEFAULT_BOTTOM_RPM = 3000.0;
 
+        // ── 2段階 RPM ──────────────────────────────────
+        // ~3 m: 近距離固定 RPM
+        public static final double RPM_CLOSE = 2800.0;
+        // 3 m~: 遠距離固定 RPM
+        public static final double RPM_FAR   = 4200.0;
+        // キャリーショット (NEUTRAL ZONE → 自陣パス) 用 RPM
+        public static final double RPM_CARRY = 3500.0;
+        // 近距離/遠距離切り替え閾値 (m)
+        public static final double RPM_THRESHOLD_M = 3.0;
+
         // RPM 許容誤差
         public static final double RPM_TOLERANCE = 100.0;
+
+        // Flywheel debounce 時間 (s) — この時間 RPM 範囲内を維持して初めて READY とする
+        public static final double FLYWHEEL_DEBOUNCE_S = 0.10;
+
+        // ホイール直径 (m) — 飛行時間推定に使用
+        public static final double FLYWHEEL_DIAMETER_M = Units.inchesToMeters(4.0);
 
         // フィードフォワード係数 kV
         public static final double KV = 0.00022;
@@ -183,6 +199,68 @@ public final class Constants {
             new Translation2d(0.0, 5.547);
         public static final Translation2d SPEAKER_RED =
             new Translation2d(FIELD_LENGTH, 5.547);
+
+        // HUB 中央座標 — REBUILT 2025-26: フィールド中央の固定構造物
+        // ※ 公式フィールド図面で実測後に更新すること
+        public static final Translation2d HUB_CENTER =
+            new Translation2d(FIELD_LENGTH / 2.0, FIELD_WIDTH / 2.0);
+
+        // HUB 開口部の高さ (m)
+        public static final double HUB_HEIGHT     = 2.64;
+
+        // シューター射出口の高さ (m)
+        public static final double SHOOTER_HEIGHT  = Units.inchesToMeters(24.0);
+
+        // NEUTRAL ZONE X 範囲 (WPIBlue 座標系) — 要図面確認
+        public static final double NEUTRAL_ZONE_MIN_X = FIELD_LENGTH / 2.0 - 1.5;
+        public static final double NEUTRAL_ZONE_MAX_X = FIELD_LENGTH / 2.0 + 1.5;
+
+        // Landing Zone 中央座標 (キャリーショット着地目標)
+        // ※ 公式フィールド図面で実測後に更新すること
+        public static final Translation2d LANDING_ZONE_BLUE =
+            new Translation2d(2.5, FIELD_WIDTH / 2.0);
+        public static final Translation2d LANDING_ZONE_RED  =
+            new Translation2d(FIELD_LENGTH - 2.5, FIELD_WIDTH / 2.0);
+    }
+
+    // ─────────────────────────────────────────────
+    //  Hood — 発射角度調整機構
+    // ─────────────────────────────────────────────
+    public static final class HoodConstants {
+        public static final int MOTOR_ID = 25;
+
+        // 可動範囲 (deg)
+        public static final double MIN_ANGLE_DEG  = 20.0;
+        public static final double MAX_ANGLE_DEG  = 70.0;
+
+        // 格納位置 (deg)
+        public static final double STOW_ANGLE_DEG = 25.0;
+
+        // ギア比 (要実機確認)
+        public static final double GEAR_RATIO     = 100.0;
+
+        // ソフトリミット (モータ回転数換算)
+        public static final double SOFT_LIMIT_FWD = MAX_ANGLE_DEG * GEAR_RATIO / 360.0;
+        public static final double SOFT_LIMIT_REV = MIN_ANGLE_DEG * GEAR_RATIO / 360.0;
+
+        // PID
+        public static final double KP = 0.08;
+        public static final double KI = 0.0;
+        public static final double KD = 0.002;
+
+        // 角度許容誤差 (deg)
+        public static final double ANGLE_TOLERANCE_DEG = 1.5;
+    }
+
+    // ─────────────────────────────────────────────
+    //  CarryShoot — NEUTRAL ZONE キャリー射出
+    // ─────────────────────────────────────────────
+    public static final class CarryConstants {
+        // 低軌道パス用 Hood 角度 (deg) — 鋭角で水平に近い放物線
+        public static final double CARRY_HOOD_ANGLE_DEG = 35.0;
+
+        // Heading PID 許容誤差 (deg)
+        public static final double HEADING_TOLERANCE_DEG = 3.0;
     }
 
     // ─────────────────────────────────────────────

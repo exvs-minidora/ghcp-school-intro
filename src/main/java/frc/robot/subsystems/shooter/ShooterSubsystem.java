@@ -5,6 +5,7 @@ import com.revrobotics.CANSparkBase.ControlType;
 import com.revrobotics.CANSparkLowLevel.MotorType;
 import com.revrobotics.RelativeEncoder;
 import com.revrobotics.SparkPIDController;
+import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Constants.ShooterConstants;
@@ -26,6 +27,11 @@ public class ShooterSubsystem extends SubsystemBase {
 
     private double targetTopRpm    = 0.0;
     private double targetBottomRpm = 0.0;
+
+    // Flywheel debounce — RPM 範囲内を一定時間維持して初めて READY とする
+    private final Timer debounceTimer   = new Timer();
+    private boolean     debounceRunning = false;
+    private boolean     flywheelReady   = false;
 
     public ShooterSubsystem() {
         topMotor    = new CANSparkFlex(ShooterConstants.TOP_MOTOR_ID,    MotorType.kBrushless);
@@ -57,9 +63,28 @@ public class ShooterSubsystem extends SubsystemBase {
 
     @Override
     public void periodic() {
-        SmartDashboard.putNumber("Shooter/TopRPM",    topEncoder.getVelocity());
-        SmartDashboard.putNumber("Shooter/BottomRPM", bottomEncoder.getVelocity());
-        SmartDashboard.putBoolean("Shooter/AtSpeed",  isAtVelocity());
+        double topRpm    = topEncoder.getVelocity();
+        double bottomRpm = bottomEncoder.getVelocity();
+        boolean withinTol = targetTopRpm > 0.0
+            && Math.abs(topRpm    - targetTopRpm)    < ShooterConstants.RPM_TOLERANCE
+            && Math.abs(bottomRpm - targetBottomRpm) < ShooterConstants.RPM_TOLERANCE;
+
+        if (withinTol) {
+            if (!debounceRunning) {
+                debounceTimer.restart();
+                debounceRunning = true;
+            }
+            flywheelReady = debounceTimer.hasElapsed(ShooterConstants.FLYWHEEL_DEBOUNCE_S);
+        } else {
+            debounceTimer.stop();
+            debounceRunning = false;
+            flywheelReady   = false;
+        }
+
+        SmartDashboard.putNumber("Shooter/TopRPM",    topRpm);
+        SmartDashboard.putNumber("Shooter/BottomRPM", bottomRpm);
+        SmartDashboard.putNumber("Shooter/TargetRPM", targetTopRpm);
+        SmartDashboard.putBoolean("Shooter/AtSpeed",  flywheelReady);
     }
 
     // ── コマンド向け API ──────────────────────────────────────
@@ -77,23 +102,35 @@ public class ShooterSubsystem extends SubsystemBase {
         bottomPID.setReference(bottomRpm, ControlType.kVelocity);
     }
 
+    /**
+     * 両ホイールに同一 RPM を設定する（上下同速の場合に使用）。
+     *
+     * @param rpm ボールの両ホイールの目標 RPM
+     */
+    public void setVelocity(double rpm) {
+        setVelocity(rpm, rpm);
+    }
+
     /** デフォルト RPM (Constants 参照) で射出準備する。 */
     public void spinUp() {
         setVelocity(ShooterConstants.DEFAULT_TOP_RPM, ShooterConstants.DEFAULT_BOTTOM_RPM);
     }
 
-    /** モータを停止する。 */
+    /** モータを停止し、debounce ステートをリセットする。 */
     public void stop() {
         targetTopRpm = targetBottomRpm = 0.0;
+        flywheelReady   = false;
+        debounceRunning = false;
+        debounceTimer.stop();
         topMotor.stopMotor();
         bottomMotor.stopMotor();
     }
 
-    /** 両ホイールが目標 RPM 内に収束しているか返す。 */
+    /**
+     * 両ホイールが目標 RPM 内に {@link ShooterConstants#FLYWHEEL_DEBOUNCE_S} 以上維持しているか返す。
+     * 目標 RPM が 0 のときは常に false を返す（未セット時の誤発火防止）。
+     */
     public boolean isAtVelocity() {
-        double topErr    = Math.abs(topEncoder.getVelocity()    - targetTopRpm);
-        double bottomErr = Math.abs(bottomEncoder.getVelocity() - targetBottomRpm);
-        return topErr < ShooterConstants.RPM_TOLERANCE
-            && bottomErr < ShooterConstants.RPM_TOLERANCE;
+        return flywheelReady;
     }
 }

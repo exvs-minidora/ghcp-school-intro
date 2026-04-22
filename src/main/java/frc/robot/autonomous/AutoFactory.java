@@ -12,6 +12,7 @@ import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.Constants.DrivetrainPhysics;
 import frc.robot.RobotContainer;
 import frc.robot.commands.intake.IntakeCommand;
+import frc.robot.commands.shooter.AimAndShootCommand;
 import frc.robot.commands.shooter.ShootCommand;
 import frc.robot.commands.extension.ExtendCommand;
 import frc.robot.commands.extension.RetractCommand;
@@ -34,8 +35,20 @@ public class AutoFactory {
             "Intake",
             new IntakeCommand(container.intake).withTimeout(2.0)
         );
+        // Autoは自動 Aim (Hood + FlywheelReady ゲート付き) を使用する
         NamedCommands.registerCommand(
             "Shoot",
+            new AimAndShootCommand(
+                container.drivetrain,
+                container.poseEstimator,
+                container.hood,
+                container.shooter,
+                container.feeder
+            ).withTimeout(3.0)
+        );
+        // 手動フォールバック用 (Hood なし)
+        NamedCommands.registerCommand(
+            "ShootManual",
             new ShootCommand(container.shooter, container.feeder).withTimeout(2.0)
         );
         NamedCommands.registerCommand(
