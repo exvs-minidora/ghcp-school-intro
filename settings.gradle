@@ -1,0 +1,8 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        maven { url = uri("https://frcmaven.wpi.edu/release") }
+    }
+}
+
+rootProject.name = 'frc2026-robot'

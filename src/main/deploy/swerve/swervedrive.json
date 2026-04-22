@@ -1,0 +1,22 @@
+{
+  "imu": {
+    "type": "pigeon2",
+    "id": 13,
+    "canbus": ""
+  },
+  "invertedIMU": false,
+  "absoluteEncoderInverted": false,
+  "modules": ["fl.json", "fr.json", "bl.json", "br.json"],
+  "maxSpeed": 4.5,
+  "optimalVoltage": 12.0,
+  "modules": {
+    "conversionFactor": {
+      "drive": {
+        "factor": 0.047286787200699704
+      },
+      "angle": {
+        "factor": 360.0
+      }
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "fileName": "YAGSL.json",
+  "name": "Yet Another Generic Swerve Library",
+  "version": "2026.0.0",
+  "uuid": "14e7a166-2f4d-4870-9462-da9c058e81b8",
+  "frcYear": "2026",
+  "mavenUrls": [
+    "https://broncbotz3481.github.io/YAGSL-Lib/vendordep/release/"
+  ],
+  "jsonUrl": "https://broncbotz3481.github.io/YAGSL-Lib/vendordep/YAGSL.json",
+  "javaDependencies": [
+    {
+      "groupId": "com.yagsl",
+      "artifactId": "YAGSL",
+      "version": "2026.0.0"
+    }
+  ],
+  "jniDependencies": [],
+  "cppDependencies": []
+}
