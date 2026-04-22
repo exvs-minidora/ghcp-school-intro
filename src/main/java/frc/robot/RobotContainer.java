@@ -20,6 +20,7 @@ import frc.robot.subsystems.feeder.FeederSubsystem;
 import frc.robot.subsystems.hood.HoodSubsystem;
 import frc.robot.subsystems.intake.IntakeSubsystem;
 import frc.robot.subsystems.shooter.ShooterSubsystem;
+import frc.robot.subsystems.spindexer.SpindexerSubsystem;
 import frc.robot.vision.LimelightSubsystem;
 import frc.robot.vision.VisionFusion;
 
@@ -36,6 +37,7 @@ public class RobotContainer {
     public final IntakeSubsystem      intake      = new IntakeSubsystem();
     public final ExtensionSubsystem   extension   = new ExtensionSubsystem();
     public final HoodSubsystem        hood        = new HoodSubsystem();
+    public final SpindexerSubsystem   spindexer   = new SpindexerSubsystem();
 
     // ── Localization & Vision ───────────────────────────────────
     public final PoseEstimatorSubsystem poseEstimator =
@@ -81,11 +83,11 @@ public class RobotContainer {
         // ── Driver ──────────────────────────────────────────────
         // A ボタン長押し: HUB 自動 Aim + Hood + FlywheelReady ゲート付き射出
         driver.a().whileTrue(new AimAndShootCommand(
-            drivetrain, poseEstimator, hood, shooter, feeder));
+            drivetrain, poseEstimator, hood, shooter, feeder, spindexer));
 
         // B ボタン長押し: NEUTRAL ZONE キャリーショット (自陣へパス射出)
         driver.b().whileTrue(new CarryShootCommand(
-            drivetrain, poseEstimator, hood, shooter, feeder));
+            drivetrain, poseEstimator, hood, shooter, feeder, spindexer));
 
         // Start ボタン: ホイールロック (X フォーメーション)
         driver.start().whileTrue(new LockWheelsCommand(drivetrain));
@@ -100,7 +102,7 @@ public class RobotContainer {
             .onFalse(new RetractCommand(extension));
 
         // A ボタン: 手動 Shoot フォールバック (Hood なし / Flywheel 故障時用)
-        operator.a().whileTrue(new ShootCommand(shooter, feeder));
+        operator.a().whileTrue(new ShootCommand(shooter, feeder, spindexer));
 
         // B ボタン: Feeder 単独
         operator.b().whileTrue(new FeedCommand(feeder));

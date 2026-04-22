@@ -1,92 +1,88 @@
 package frc.robot.subsystems.extension;
 
-import com.revrobotics.CANSparkMax;
-import com.revrobotics.CANSparkBase.ControlType;
-import com.revrobotics.CANSparkBase.SoftLimitDirection;
-import com.revrobotics.CANSparkLowLevel.MotorType;
-import com.revrobotics.RelativeEncoder;
-import com.revrobotics.SparkPIDController;
+import com.ctre.phoenix6.configs.TalonFXConfiguration;
+import com.ctre.phoenix6.controls.PositionVoltage;
+import com.ctre.phoenix6.hardware.TalonFX;
+import com.ctre.phoenix6.signals.NeutralModeValue;
+import edu.wpi.first.wpilibj.DutyCycleEncoder;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Constants.ExtensionConstants;
 
 /**
  * アーム・クライマー等の伸展機構を制御するサブシステム。
- * REV SPARK MAX + 統合エンコーダで位置制御を行う。
+ * CTRE KrakenX60 (TalonFX / Phoenix 6) + ThroughBoreEncoder (DIO 0) を使用する。
+ * 起動時に ThroughBoreEncoder の絶対値で TalonFX 内部エンコーダをシードする。
  */
 public class ExtensionSubsystem extends SubsystemBase {
 
-    private final CANSparkMax motor;
-    private final RelativeEncoder encoder;
-    private final SparkPIDController pid;
+    private final TalonFX          motor;
+    private final DutyCycleEncoder absoluteEncoder;
+    private final PositionVoltage  positionRequest = new PositionVoltage(0).withSlot(0);
 
     private double targetPosition = 0.0;
 
     public ExtensionSubsystem() {
-        motor = new CANSparkMax(ExtensionConstants.MOTOR_ID, MotorType.kBrushless);
-        motor.restoreFactoryDefaults();
-        motor.setSmartCurrentLimit(40);
+        motor           = new TalonFX(ExtensionConstants.MOTOR_ID);
+        absoluteEncoder = new DutyCycleEncoder(ExtensionConstants.THROUGH_BORE_DIO_PORT);
 
-        // ソフトリミット設定
-        motor.setSoftLimit(SoftLimitDirection.kForward,
-            (float) ExtensionConstants.SOFT_LIMIT_FWD);
-        motor.setSoftLimit(SoftLimitDirection.kReverse,
-            (float) ExtensionConstants.SOFT_LIMIT_REV);
-        motor.enableSoftLimit(SoftLimitDirection.kForward, true);
-        motor.enableSoftLimit(SoftLimitDirection.kReverse, true);
+        TalonFXConfiguration cfg = new TalonFXConfiguration();
+        cfg.Slot0.kP = ExtensionConstants.KP;
+        cfg.Slot0.kI = ExtensionConstants.KI;
+        cfg.Slot0.kD = ExtensionConstants.KD;
+        cfg.SoftwareLimitSwitch.ForwardSoftLimitThreshold = ExtensionConstants.SOFT_LIMIT_FWD;
+        cfg.SoftwareLimitSwitch.ReverseSoftLimitThreshold = ExtensionConstants.SOFT_LIMIT_REV;
+        cfg.SoftwareLimitSwitch.ForwardSoftLimitEnable    = true;
+        cfg.SoftwareLimitSwitch.ReverseSoftLimitEnable    = true;
+        cfg.MotorOutput.NeutralMode = NeutralModeValue.Brake;
+        cfg.CurrentLimits.SupplyCurrentLimit       = 40;
+        cfg.CurrentLimits.SupplyCurrentLimitEnable = true;
 
-        encoder = motor.getEncoder();
-        pid     = motor.getPIDController();
-        pid.setP(ExtensionConstants.KP);
-        pid.setI(ExtensionConstants.KI);
-        pid.setD(ExtensionConstants.KD);
-
-        motor.burnFlash();
+        motor.getConfigurator().apply(cfg);
     }
 
     @Override
     public void periodic() {
-        SmartDashboard.putNumber("Extension/Position",  encoder.getPosition());
-        SmartDashboard.putNumber("Extension/Target",    targetPosition);
-        SmartDashboard.putBoolean("Extension/AtTarget", isAtTarget());
+        SmartDashboard.putNumber("Extension/Position",       motor.getPosition().getValueAsDouble());
+        SmartDashboard.putNumber("Extension/AbsEncoder",     absoluteEncoder.get());
+        SmartDashboard.putNumber("Extension/Target",         targetPosition);
+        SmartDashboard.putBoolean("Extension/AtTarget",      isAtTarget());
     }
 
     // ── コマンド向け API ──────────────────────────────────────
 
-    /** 指定した回転数位置へ動かす。 */
     public void setPosition(double rotations) {
         targetPosition = rotations;
-        pid.setReference(rotations, ControlType.kPosition);
+        motor.setControl(positionRequest.withPosition(rotations));
     }
 
-    /** フル展開位置へ動かす。 */
     public void extend() {
         setPosition(ExtensionConstants.EXTEND_POSITION);
     }
 
-    /** 格納位置へ動かす。 */
     public void retract() {
         setPosition(ExtensionConstants.RETRACT_POSITION);
     }
 
-    /** モータを停止する。 */
     public void stop() {
         motor.stopMotor();
     }
 
-    /** エンコーダ位置をゼロリセットする (格納位置を原点に)。 */
-    public void resetEncoder() {
-        encoder.setPosition(0.0);
+    /** ThroughBoreEncoder の絶対値を使って TalonFX 内部エンコーダをゼロリセットする。 */
+    public void resetEncoderFromAbsolute() {
+        motor.setPosition(absoluteEncoder.get());
     }
 
-    /** 目標位置内に収束しているか返す。 */
+    public void resetEncoder() {
+        motor.setPosition(0.0);
+    }
+
     public boolean isAtTarget() {
-        return Math.abs(encoder.getPosition() - targetPosition)
+        return Math.abs(motor.getPosition().getValueAsDouble() - targetPosition)
             < ExtensionConstants.POSITION_TOLERANCE;
     }
 
-    /** 現在の位置 (回転数) を返す。 */
     public double getPosition() {
-        return encoder.getPosition();
+        return motor.getPosition().getValueAsDouble();
     }
 }

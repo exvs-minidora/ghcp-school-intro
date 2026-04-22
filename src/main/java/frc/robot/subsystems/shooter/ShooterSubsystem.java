@@ -1,10 +1,8 @@
 package frc.robot.subsystems.shooter;
 
-import com.revrobotics.CANSparkFlex;
-import com.revrobotics.CANSparkBase.ControlType;
-import com.revrobotics.CANSparkLowLevel.MotorType;
-import com.revrobotics.RelativeEncoder;
-import com.revrobotics.SparkPIDController;
+import com.ctre.phoenix6.configs.TalonFXConfiguration;
+import com.ctre.phoenix6.controls.VelocityVoltage;
+import com.ctre.phoenix6.hardware.TalonFX;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
@@ -12,18 +10,16 @@ import frc.robot.Constants.ShooterConstants;
 
 /**
  * 射出ホイールを 2 モータで制御するサブシステム。
- * REV SPARK Flex (CANSparkFlex) を使用する。
+ * CTRE KrakenX60 (TalonFX / Phoenix 6) を使用する。
+ * 速度単位は RPS (rotations per second) で統一し、外部 RPM を変換して渡す。
  */
 public class ShooterSubsystem extends SubsystemBase {
 
-    private final CANSparkFlex topMotor;
-    private final CANSparkFlex bottomMotor;
+    private final TalonFX topMotor;
+    private final TalonFX bottomMotor;
 
-    private final SparkPIDController topPID;
-    private final SparkPIDController bottomPID;
-
-    private final RelativeEncoder topEncoder;
-    private final RelativeEncoder bottomEncoder;
+    private final VelocityVoltage topRequest    = new VelocityVoltage(0).withSlot(0);
+    private final VelocityVoltage bottomRequest = new VelocityVoltage(0).withSlot(0);
 
     private double targetTopRpm    = 0.0;
     private double targetBottomRpm = 0.0;
@@ -34,37 +30,26 @@ public class ShooterSubsystem extends SubsystemBase {
     private boolean     flywheelReady   = false;
 
     public ShooterSubsystem() {
-        topMotor    = new CANSparkFlex(ShooterConstants.TOP_MOTOR_ID,    MotorType.kBrushless);
-        bottomMotor = new CANSparkFlex(ShooterConstants.BOTTOM_MOTOR_ID, MotorType.kBrushless);
+        topMotor    = new TalonFX(ShooterConstants.TOP_MOTOR_ID);
+        bottomMotor = new TalonFX(ShooterConstants.BOTTOM_MOTOR_ID);
 
-        topMotor.restoreFactoryDefaults();
-        bottomMotor.restoreFactoryDefaults();
+        TalonFXConfiguration cfg = new TalonFXConfiguration();
+        cfg.Slot0.kP = ShooterConstants.KP;
+        cfg.Slot0.kI = ShooterConstants.KI;
+        cfg.Slot0.kD = ShooterConstants.KD;
+        cfg.Slot0.kV = ShooterConstants.KV;
+        cfg.CurrentLimits.SupplyCurrentLimit       = 60;
+        cfg.CurrentLimits.SupplyCurrentLimitEnable = true;
 
-        // 電流制限 (A)
-        topMotor.setSmartCurrentLimit(60);
-        bottomMotor.setSmartCurrentLimit(60);
-
-        topEncoder    = topMotor.getEncoder();
-        bottomEncoder = bottomMotor.getEncoder();
-
-        topPID    = topMotor.getPIDController();
-        bottomPID = bottomMotor.getPIDController();
-
-        for (SparkPIDController pid : new SparkPIDController[]{topPID, bottomPID}) {
-            pid.setP(ShooterConstants.KP);
-            pid.setI(ShooterConstants.KI);
-            pid.setD(ShooterConstants.KD);
-            pid.setFF(ShooterConstants.KV);
-        }
-
-        topMotor.burnFlash();
-        bottomMotor.burnFlash();
+        topMotor.getConfigurator().apply(cfg);
+        bottomMotor.getConfigurator().apply(cfg);
     }
 
     @Override
     public void periodic() {
-        double topRpm    = topEncoder.getVelocity();
-        double bottomRpm = bottomEncoder.getVelocity();
+        double topRpm    = topMotor.getVelocity().getValueAsDouble()    * 60.0;
+        double bottomRpm = bottomMotor.getVelocity().getValueAsDouble() * 60.0;
+
         boolean withinTol = targetTopRpm > 0.0
             && Math.abs(topRpm    - targetTopRpm)    < ShooterConstants.RPM_TOLERANCE
             && Math.abs(bottomRpm - targetBottomRpm) < ShooterConstants.RPM_TOLERANCE;
@@ -89,34 +74,21 @@ public class ShooterSubsystem extends SubsystemBase {
 
     // ── コマンド向け API ──────────────────────────────────────
 
-    /**
-     * 目標 RPM を設定して速度制御を開始する。
-     *
-     * @param topRpm    上ホイール目標 RPM
-     * @param bottomRpm 下ホイール目標 RPM
-     */
     public void setVelocity(double topRpm, double bottomRpm) {
         targetTopRpm    = topRpm;
         targetBottomRpm = bottomRpm;
-        topPID.setReference(topRpm,    ControlType.kVelocity);
-        bottomPID.setReference(bottomRpm, ControlType.kVelocity);
+        topMotor.setControl(topRequest.withVelocity(topRpm / 60.0));
+        bottomMotor.setControl(bottomRequest.withVelocity(bottomRpm / 60.0));
     }
 
-    /**
-     * 両ホイールに同一 RPM を設定する（上下同速の場合に使用）。
-     *
-     * @param rpm ボールの両ホイールの目標 RPM
-     */
     public void setVelocity(double rpm) {
         setVelocity(rpm, rpm);
     }
 
-    /** デフォルト RPM (Constants 参照) で射出準備する。 */
     public void spinUp() {
         setVelocity(ShooterConstants.DEFAULT_TOP_RPM, ShooterConstants.DEFAULT_BOTTOM_RPM);
     }
 
-    /** モータを停止し、debounce ステートをリセットする。 */
     public void stop() {
         targetTopRpm = targetBottomRpm = 0.0;
         flywheelReady   = false;
@@ -126,10 +98,6 @@ public class ShooterSubsystem extends SubsystemBase {
         bottomMotor.stopMotor();
     }
 
-    /**
-     * 両ホイールが目標 RPM 内に {@link ShooterConstants#FLYWHEEL_DEBOUNCE_S} 以上維持しているか返す。
-     * 目標 RPM が 0 のときは常に false を返す（未セット時の誤発火防止）。
-     */
     public boolean isAtVelocity() {
         return flywheelReady;
     }

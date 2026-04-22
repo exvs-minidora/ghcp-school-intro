@@ -47,10 +47,10 @@ public final class Constants {
     //  Drivetrain — 物理パラメータ
     // ─────────────────────────────────────────────
     public static final class DrivetrainPhysics {
-        // ホイールベース (m) — FL→FR 間の横幅
-        public static final double TRACK_WIDTH = Units.inchesToMeters(24.0);
+        // ホイールベース (m) — FL→FR 間の横幅 (SDS MK4n 645mm フレーム)
+        public static final double TRACK_WIDTH = 0.3225;
         // ホイールベース (m) — FL→BL 間の前後長
-        public static final double WHEEL_BASE  = Units.inchesToMeters(24.0);
+        public static final double WHEEL_BASE  = 0.3225;
 
         // ドライブ半径 = コーナーまでの距離 (AutoBuilder 用)
         public static final double DRIVE_RADIUS =
@@ -59,11 +59,11 @@ public final class Constants {
         // ホイール直径 (m)
         public static final double WHEEL_DIAMETER = Units.inchesToMeters(4.0);
 
-        // ドライブギア比 (出力/入力)
-        public static final double DRIVE_GEAR_RATIO = 6.75;
+        // ドライブギア比 — SDS MK4n L2
+        public static final double DRIVE_GEAR_RATIO = 5.90;
 
-        // ステアギア比
-        public static final double STEER_GEAR_RATIO = 12.8;
+        // ステアギア比 — SDS MK4n
+        public static final double STEER_GEAR_RATIO = 18.75;
 
         // 最大速度 (m/s) / 最大角速度 (rad/s)
         public static final double MAX_SPEED     = 4.5;
@@ -149,6 +149,9 @@ public final class Constants {
 
         // 位置許容誤差 (回転数)
         public static final double POSITION_TOLERANCE = 1.0;
+
+        // ThroughBoreEncoder DIO ポート番号
+        public static final int THROUGH_BORE_DIO_PORT = 0;
     }
 
     // ─────────────────────────────────────────────
@@ -236,8 +239,8 @@ public final class Constants {
         // 格納位置 (deg)
         public static final double STOW_ANGLE_DEG = 25.0;
 
-        // ギア比 (要実機確認)
-        public static final double GEAR_RATIO     = 100.0;
+        // ギア比 — KrakenX60 → Hood 10:1
+        public static final double GEAR_RATIO     = 10.0;
 
         // ソフトリミット (モータ回転数換算)
         public static final double SOFT_LIMIT_FWD = MAX_ANGLE_DEG * GEAR_RATIO / 360.0;
@@ -250,6 +253,17 @@ public final class Constants {
 
         // 角度許容誤差 (deg)
         public static final double ANGLE_TOLERANCE_DEG = 1.5;
+    }
+
+    // ─────────────────────────────────────────────
+    //  Spindexer — CAN ID & 制御
+    // ─────────────────────────────────────────────
+    public static final class SpindexerConstants {
+        public static final int    MOTOR_ID          = 26;
+        public static final double SPIN_SPEED        = 0.5;   // duty-cycle 0〜1
+        public static final double REVERSE_SPEED     = -0.3;
+        // Feeder 起動後この時間経過でSpindexerを起動する (s)
+        public static final double SPINDEXER_DELAY_S = 0.15;
     }
 
     // ─────────────────────────────────────────────

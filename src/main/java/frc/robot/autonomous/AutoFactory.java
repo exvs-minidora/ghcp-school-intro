@@ -43,13 +43,14 @@ public class AutoFactory {
                 container.poseEstimator,
                 container.hood,
                 container.shooter,
-                container.feeder
+                container.feeder,
+                container.spindexer
             ).withTimeout(3.0)
         );
         // 手動フォールバック用 (Hood なし)
         NamedCommands.registerCommand(
             "ShootManual",
-            new ShootCommand(container.shooter, container.feeder).withTimeout(2.0)
+            new ShootCommand(container.shooter, container.feeder, container.spindexer).withTimeout(2.0)
         );
         NamedCommands.registerCommand(
             "Extend",

@@ -1,11 +1,9 @@
 package frc.robot.subsystems.hood;
 
-import com.revrobotics.CANSparkMax;
-import com.revrobotics.CANSparkBase.ControlType;
-import com.revrobotics.CANSparkBase.SoftLimitDirection;
-import com.revrobotics.CANSparkLowLevel.MotorType;
-import com.revrobotics.RelativeEncoder;
-import com.revrobotics.SparkPIDController;
+import com.ctre.phoenix6.configs.TalonFXConfiguration;
+import com.ctre.phoenix6.controls.PositionVoltage;
+import com.ctre.phoenix6.hardware.TalonFX;
+import com.ctre.phoenix6.signals.NeutralModeValue;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
@@ -13,90 +11,67 @@ import frc.robot.Constants.HoodConstants;
 
 /**
  * 射出角度を調整する Hood サブシステム。
- *
- * <p>REV SPARK MAX + 統合エンコーダで回転数 → 角度 (deg) の位置制御を行う。
- * 可動範囲は {@link HoodConstants#MIN_ANGLE_DEG} 〜 {@link HoodConstants#MAX_ANGLE_DEG}。
- * ロボット起動時は格納位置 ({@link HoodConstants#STOW_ANGLE_DEG}) へ移動する。
- *
- * <p>エンコーダ 1 回転 = 360 / GEAR_RATIO 度 として換算する。
+ * CTRE KrakenX60 (TalonFX / Phoenix 6) を使用する。
+ * ギア比 10:1 で内部エンコーダ (回転数) → 角度 (deg) を換算する。
  */
 public class HoodSubsystem extends SubsystemBase {
 
-    private final CANSparkMax        motor;
-    private final RelativeEncoder    encoder;
-    private final SparkPIDController pid;
+    private final TalonFX motor;
+    private final PositionVoltage positionRequest = new PositionVoltage(0).withSlot(0);
 
     private double targetAngleDeg = HoodConstants.STOW_ANGLE_DEG;
 
     public HoodSubsystem() {
-        motor = new CANSparkMax(HoodConstants.MOTOR_ID, MotorType.kBrushless);
-        motor.restoreFactoryDefaults();
-        motor.setSmartCurrentLimit(20);
+        motor = new TalonFX(HoodConstants.MOTOR_ID);
 
-        // ソフトリミット設定
-        motor.setSoftLimit(SoftLimitDirection.kForward, (float) HoodConstants.SOFT_LIMIT_FWD);
-        motor.setSoftLimit(SoftLimitDirection.kReverse, (float) HoodConstants.SOFT_LIMIT_REV);
-        motor.enableSoftLimit(SoftLimitDirection.kForward, true);
-        motor.enableSoftLimit(SoftLimitDirection.kReverse, true);
+        TalonFXConfiguration cfg = new TalonFXConfiguration();
+        cfg.Slot0.kP = HoodConstants.KP;
+        cfg.Slot0.kI = HoodConstants.KI;
+        cfg.Slot0.kD = HoodConstants.KD;
+        cfg.SoftwareLimitSwitch.ForwardSoftLimitThreshold = HoodConstants.SOFT_LIMIT_FWD;
+        cfg.SoftwareLimitSwitch.ReverseSoftLimitThreshold = HoodConstants.SOFT_LIMIT_REV;
+        cfg.SoftwareLimitSwitch.ForwardSoftLimitEnable    = true;
+        cfg.SoftwareLimitSwitch.ReverseSoftLimitEnable    = true;
+        cfg.MotorOutput.NeutralMode = NeutralModeValue.Brake;
+        cfg.CurrentLimits.SupplyCurrentLimit       = 20;
+        cfg.CurrentLimits.SupplyCurrentLimitEnable = true;
 
-        encoder = motor.getEncoder();
-        pid     = motor.getPIDController();
-        pid.setP(HoodConstants.KP);
-        pid.setI(HoodConstants.KI);
-        pid.setD(HoodConstants.KD);
-
-        motor.burnFlash();
-
-        // 起動時に格納位置へ
+        motor.getConfigurator().apply(cfg);
         stow();
     }
 
     @Override
     public void periodic() {
-        SmartDashboard.putNumber("Hood/AngleDeg",   getAngleDeg());
-        SmartDashboard.putNumber("Hood/TargetDeg",  targetAngleDeg);
-        SmartDashboard.putBoolean("Hood/AtTarget",  isAtTarget());
+        SmartDashboard.putNumber("Hood/AngleDeg",  getAngleDeg());
+        SmartDashboard.putNumber("Hood/TargetDeg", targetAngleDeg);
+        SmartDashboard.putBoolean("Hood/AtTarget", isAtTarget());
     }
 
-    // ── 公開 API ──────────────────────────────────────────────
-
-    /**
-     * Hood を指定角度 (deg) へ動かす。範囲外はクランプする。
-     *
-     * @param angleDeg 目標角度 (deg)
-     */
     public void setAngleDeg(double angleDeg) {
         targetAngleDeg = MathUtil.clamp(angleDeg,
             HoodConstants.MIN_ANGLE_DEG, HoodConstants.MAX_ANGLE_DEG);
-        pid.setReference(degToRotations(targetAngleDeg), ControlType.kPosition);
+        motor.setControl(positionRequest.withPosition(degToRotations(targetAngleDeg)));
     }
 
-    /** 格納位置 ({@link HoodConstants#STOW_ANGLE_DEG}) へ動かす。 */
     public void stow() {
         setAngleDeg(HoodConstants.STOW_ANGLE_DEG);
     }
 
-    /** モータを停止する（位置保持を解除）。 */
     public void stop() {
         motor.stopMotor();
     }
 
-    /** 現在の角度 (deg) を返す。 */
     public double getAngleDeg() {
-        return rotationsToDeg(encoder.getPosition());
+        return rotationsToDeg(motor.getPosition().getValueAsDouble());
     }
 
-    /** 目標角度内に収束しているか返す。 */
     public boolean isAtTarget() {
         return Math.abs(getAngleDeg() - targetAngleDeg) < HoodConstants.ANGLE_TOLERANCE_DEG;
     }
 
-    /** 起動時にエンコーダをゼロリセットする（格納位置を原点とする場合に呼ぶ）。 */
     public void resetEncoder() {
-        encoder.setPosition(degToRotations(HoodConstants.STOW_ANGLE_DEG));
+        motor.setPosition(degToRotations(HoodConstants.STOW_ANGLE_DEG));
     }
-
-    // ── 変換ヘルパー ──────────────────────────────────────────
 
     private static double degToRotations(double deg) {
         return deg * HoodConstants.GEAR_RATIO / 360.0;
